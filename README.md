@@ -23,3 +23,8 @@ optional arguments:
   --tol -t [-t ...]     Library match tolerance in dalton (Da) for fragment m/z annotation (INFO: The tolerance of 0.5 Da and 0.05 Da was set as default)
   --mz_type -m [-m ...] Specify the type of fragment m/z values present in the input spectral library (Ex: "average" or "mono")
 ```
+Run Blib2OpenSwath using example data
+
+```
+>python3 blib2openswath.py --infile 
+```
