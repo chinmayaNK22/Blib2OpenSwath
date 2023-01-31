@@ -1,6 +1,13 @@
 # Blib2OpenSwath
 A Python script to convert the spectral library in BLIB format (.blib) from either Skyline or BiblioSpec to readable library format (OpenSwath or Spectronaut tsv format)
 
+Install Requirements
+
+```
+>pip install -r requirements.txt
+```
+
+How to run Blib2OpenSwath
 
 ```
 >python3 blib2openswath.py -h
