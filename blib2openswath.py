@@ -1,16 +1,11 @@
 import sqlite3
-#import base64
-#import zlib
-from read_fasta_file_v2 import readfasta
-from protein_digestor_v2 import ProteinDigestion
+from scripts.read_fasta_file import readfasta
+from scripts.protein_digestor import ProteinDigestion
 from pyteomics import mass, parser
 import numpy as np
 from struct import *
-#import codecs
-#import binascii
-#from pyopenms import *
-import pyteomics_utils_v1
-import parse_binary
+from scripts import pyteomics_utils
+from scripts import parse_binary
 import os
 import argparse
 
@@ -29,27 +24,30 @@ args = parser.parse_args()
 
 def fetch_sqlite3_db(infile, table):
 
-    con = sqlite3.connect(infile)
-    cur = con.cursor()
-    if table == 'RefSpectra':
-        cur.execute("SELECT * FROM RefSpectra")
-        names = list(map(lambda x: x[0], cur.description))
-        return names, cur.fetchall()
+    try:
+        con = sqlite3.connect(infile)
+        cur = con.cursor()
+        if table == 'RefSpectra':
+            cur.execute("SELECT * FROM RefSpectra")
+            names = list(map(lambda x: x[0], cur.description))
+            return names, cur.fetchall()
 
-    elif table == 'RefSpectraPeaks':
-        cur.execute("SELECT * FROM RefSpectraPeaks")
-        #names = list(map(lambda x: x[0], cur.description))
-        return cur.fetchall()
+        elif table == 'RefSpectraPeaks':
+            cur.execute("SELECT * FROM RefSpectraPeaks")
+            #names = list(map(lambda x: x[0], cur.description))
+            return cur.fetchall()
 
-    elif table == 'Modifications':
-        cur.execute("SELECT * FROM Modifications")
-        return cur.fetchall()
+        elif table == 'Modifications':
+            cur.execute("SELECT * FROM Modifications")
+            return cur.fetchall()
 
-    elif table == 'SpectrumSourceFiles':
-        cur.execute("SELECT * FROM SpectrumSourceFiles")
-        return cur.fetchall()
+        elif table == 'SpectrumSourceFiles':
+            cur.execute("SELECT * FROM SpectrumSourceFiles")
+            return cur.fetchall()
     
-    con.close()
+        con.close()
+    except:
+        raise Exception(f"The input spectral library {infile} is not a BiblioSpec or Skyline generated spectral library")
 
 
 def digest_pro(fasta):
@@ -93,10 +91,7 @@ def annotate_lib(infile, fasta):
         if peptide in theo_peps:
             c += 1
             output.append(list(map(str,list(pinfo))) + [';'.join(theo_peps[peptide])] + [str(len(list(theo_peps[peptide])))])
-            #print (pinfo, theo_peps[pinfo[pep_idx]])
-            #annotated_pro = {rows[0].split(' ')[0]:1 for rows in readfasta(fasta).read() if pinfo[pep_idx] in rows[1]}
-            #if len(list(annotated_pro)) != 0:
-            #output.append(list(pinfo) + list(annotated_pro) + [str(len(list(annotated_pro)))])
+
         else:
             a += 1
             output.append(list(map(str,list(pinfo))) + ["Not Found","NA"])
@@ -153,7 +148,6 @@ def frags(pep):
 
     #fragments = np.stack((frag_ions, frag_mz), axis=0)
 
-    #print (fragments.shape)
     return frag_ions, frag_mz
 
 def align_spectra(theo_spectrum, observed_spectrum):
@@ -191,8 +185,6 @@ def map_frags(infile, fasta, tolerance, mass_type):
 
     print (f'INFO: There were {len(list(all_mods))} modifications found in the library')
 
-    #modifications = {15.994915:'ox', 57.021464:'[+57]', 42.010565:'Acetyl'}
-
     peaks = fetch_sqlite3_db(infile, 'RefSpectraPeaks')
     rawfiles = fetch_sqlite3_db(infile, 'SpectrumSourceFiles')
     print (f'INFO: The input library {infile} consists of database search results from {len(rawfiles)} raw files')
@@ -220,15 +212,15 @@ def map_frags(infile, fasta, tolerance, mass_type):
         #### Generate theoretical fragment ions with or without modifications accordingly
         if iD in Mods:
             if mass_type == 'average':
-                ion_type, theo_mz = pyteomics_utils_v1.calc_theo_mz(pep, z, None, ['-H2O', '-NH3', '-CO'], Mods[iD], True)
+                ion_type, theo_mz = pyteomics_utils.calc_theo_mz(pep, z, None, ['-H2O', '-NH3', '-CO'], Mods[iD], True)
             else:
-                ion_type, theo_mz = pyteomics_utils_v1.calc_theo_mz(pep, z, None, ['-H2O', '-NH3', '-CO'], Mods[iD], False)
+                ion_type, theo_mz = pyteomics_utils.calc_theo_mz(pep, z, None, ['-H2O', '-NH3', '-CO'], Mods[iD], False)
 
         else:
             if mass_type == 'average':
-                ion_type, theo_mz = pyteomics_utils_v1.calc_theo_mz(pep, z, None, ['-H2O', '-NH3', '-CO'], None, True)
+                ion_type, theo_mz = pyteomics_utils.calc_theo_mz(pep, z, None, ['-H2O', '-NH3', '-CO'], None, True)
             else:
-                ion_type, theo_mz = pyteomics_utils_v1.calc_theo_mz(pep, z, None, ['-H2O', '-NH3', '-CO'], None, False)
+                ion_type, theo_mz = pyteomics_utils.calc_theo_mz(pep, z, None, ['-H2O', '-NH3', '-CO'], None, False)
             
         #theo_ions, theo_mz = frags(modpep)
 
@@ -274,21 +266,10 @@ def map_frags(infile, fasta, tolerance, mass_type):
                         if exp_mz_idx == len(ex_frag_intensity)-1 or exp_mz_idx == len(ex_frag_intensity):
                             matching_intense = np.append(matching_intense, ex_frag_intensity[-1])
                         else:
-                            #print ("B", ex_frag_intensity[exp_mz_idx])
                             try:
                                 matching_intense = np.append(matching_intense, ex_frag_intensity[exp_mz_idx])
                             except:
                                 matching_intense = np.append(matching_intense, 0)
-
-                            #print (exp_mz_idx, ion_type[index], len(ex_frag_mz), len(ex_frag_intensity), ex_frag_mz, ex_frag_intensity)
-                            #print (f'Could not fetch the intensity of fragment ion {exp_mz} in the {exp_mz_idx} of intensity array for the peptide {pep}')
-        
-        #print (iD, pep, modpep, z, AASequence.fromString(modpep), len(matching_ions), len(matching_values))
-        
-        #if len(matching_values) not in frags_count:
-        #    frags_count[len(matching_values)] = [len(matching_values)]
-        #else:
-        #    frags_count[len(matching_values)].append(len(matching_values))
 
         if modpep + '@' + str(z) not in all_peps:
             all_peps[modpep + '@' + str(z)] = [str(len(matching_values)) + '@' + str(iD)]
@@ -324,9 +305,6 @@ def map_frags(infile, fasta, tolerance, mass_type):
 
         
     print (f'INFO: The library contains annotated peaks for {len(all_peps)} peptide precursors')
-    #for k, v in all_peps.items():
-    #    print (k, len(v), sorted(v))
-
     print (f'INFO: Peptides with less than 3 transitions were excluded in the output library')
     print (f'INFO: {len(output)} transitions corresponding to {len(all_peps)} peptide precursors were converted to a OpenSwath library format')
     
@@ -335,16 +313,10 @@ def map_frags(infile, fasta, tolerance, mass_type):
         outf.write("transition_group_id\ttransition_name\tProteinId\tPeptideSequence\tModifiedPeptideSequence\tFullPeptideName\tRetentionTime\tPrecursorMz\tPrecursorCharge\tProductMz\tProductCharge\tLibraryIntensity\tFragmentIonType\tFragmentSeriesNumber\tIsDecoy\tquantifying_transition\n")
         outf.writelines('\t'.join(i) + '\n' for i in output)
 
-    #for k, v in frags_count.items():
-    #    print (k, len(v))
-
     print (f"COMPLETED")
     print (f"INFO: A OpenSwath compatible spectral library was generated from {os.path.split(infile)[1]}")
 
 #annotate_lib(infile, fasta)
     
-if __name__== "__main__":   
-    infile = "M_vaccae\PASS00954_M_vaccae_Wall_CID_LFQ_Proteomics_SpecLib_112522.blib"
-    fasta = "Databases\Mycobacterium vaccae GCF_001655245.1_ASM165524v1 protein.fasta"
-
-    map_frags(infile, fasta, 0.5, 'average')
+if __name__== "__main__":
+    map_frags(args.infile[0], args.fasta[0], args.tol[0], args.mz_type[0])
