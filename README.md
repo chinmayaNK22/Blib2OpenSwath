@@ -28,3 +28,5 @@ optional arguments:
 ```
 >python3 blib2openswath.py --infile 
 ```
+## Contact
+For more information, post an issue or send an email to chinnu.kemmaai@gmail.com
