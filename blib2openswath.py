@@ -313,10 +313,26 @@ def map_frags(infile, fasta, tolerance, mass_type):
         outf.write("transition_group_id\ttransition_name\tProteinId\tPeptideSequence\tModifiedPeptideSequence\tFullPeptideName\tRetentionTime\tPrecursorMz\tPrecursorCharge\tProductMz\tProductCharge\tLibraryIntensity\tFragmentIonType\tFragmentSeriesNumber\tIsDecoy\tquantifying_transition\n")
         outf.writelines('\t'.join(i) + '\n' for i in output)
 
-    print (f"COMPLETED")
-    print (f"INFO: A OpenSwath compatible spectral library was generated from {os.path.split(infile)[1]}")
+    print (f"INFO: A OpenSwath compatible spectral library {outfile} was generated")
 
 #annotate_lib(infile, fasta)
     
 if __name__== "__main__":
-    map_frags(args.infile[0], args.fasta[0], args.tol[0], args.mz_type[0])
+
+    if os.path.isfile(os.path.join(args.infile[0])) and args.infile[0].split('.')[-1] == 'blib':
+        map_frags(args.infile[0], args.fasta[0], args.tol[0], args.mz_type[0])
+        print (f"FINISHED: Completed the convertion of {args.infile[0]} to OpenSwath format")
+
+    #### Convert multiple BLIB spectral libraries present in a given input folder in loop
+    elif os.path.isdir(os.path.join(args.infile[0])):
+        infiles = []
+        for blibs in os.listdir(os.path.join(args.infile[0])):
+            if os.path.isfile(os.path.join(args.infile[0], blibs)) and blibs.split('.')[-1] == 'blib':
+                infiles.append(os.path.join(args.infile[0], blibs))
+
+        print (f"INFO: Found {len(infiles)} BLIB spectral library files in the given input path {args.infile[0]}")
+
+        for idx, infile in enumerate(infiles):
+            print (f"INFO: Processing file {idx + 1} of {len(infiles)} BLIB spectral libraries in {args.infile[0]}")
+            map_frags(infile, args.fasta[0], args.tol[0], args.mz_type[0])
+            print (f"FINISHED: Completed the convertion of {os.path.split(infile)[1]} to OpenSwath format")
