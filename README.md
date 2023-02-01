@@ -7,7 +7,7 @@ A Python script to convert the spectral library in BLIB format (.blib) from eith
 >pip install -r requirements.txt
 ```
 
-## How to run Blib2OpenSwath
+## Usage of Blib2OpenSwath
 
 ```
 >python3 blib2openswath.py -h
