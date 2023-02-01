@@ -10,7 +10,7 @@ A Python script to convert the spectral library in BLIB format (.blib) from eith
 ## Usage
 
 ```
->python3 blib2openswath.py -h
+>python blib2openswath.py -h
 
 usage: blib2openswath.py [-h] [--infile -i [-i ...]] [--fasta -f [-f ...]] [--tol -t [-t ...]] [--mz_type -m [-m ...]]
 
@@ -26,7 +26,7 @@ optional arguments:
 ## Example
 
 ```
->python3 blib2openswath.py --infile 
+>python blib2openswath.py --infile data\library\Spectral_library.blib --fasta data\database\sequence.fasta --tol 0.02 --mz_type mono 
 ```
 ## Contact
 For more information, post an issue or send an email to chinnu.kemmaai@gmail.com
