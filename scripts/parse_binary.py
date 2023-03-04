@@ -19,7 +19,15 @@ def unpack_array(bin_array, numpeaks, array_type):
         decoded_array = unpack(a_format, decompress_bin_array)
         parsed_array = np.asarray(decoded_array)
     except:
-        decoded_array = unpack(a_format, bin_array)
+        try:
+            decoded_array = unpack(a_format, bin_array)
+        except:
+            if "d" in a_format:
+                new_format = "<" + str(len(bin_array)) + "d"
+            elif "f" in a_format:
+                new_format = "<" + str(len(bin_array)) + "f"
+                                       
+            decoded_array = unpack(new_format, bin_array)
+            
         parsed_array = np.asarray(decoded_array)
-
     return parsed_array
