@@ -71,7 +71,7 @@ def digest_pro(fasta):
                     else:
                         dig_peps[pep].append(rows[0].split(' ')[0])
 
-    print (f'INFO: The theoretical {protease} digestion of {os.path.split(fasta)[1]} has resulted in {len(dig_peps)} tryptic peptides')
+    print (f'INFO: The in-silico {protease} digestion of {os.path.split(fasta)[1]} has resulted in {len(dig_peps)} tryptic peptides')
     
     return dig_peps
 
@@ -164,7 +164,7 @@ def align_spectra(theo_spectrum, observed_spectrum):
     print("Number of matched peaks: " + str(len(alignment)))
     print("ion\ttheo. m/z\tobserved m/z")
 
-def map_frags(infile, fasta, tolerance, mass_type):
+def map_frags(infile, fasta, tolerance, mass_type, out_fmt, file_fmt):
     theo_peps = digest_pro(fasta)
     print (f"INFO: A library match tolerance of {tolerance} Da was set for the spectral library generation")
 
@@ -199,6 +199,7 @@ def map_frags(infile, fasta, tolerance, mass_type):
 
     print (f'INFO: Fragments with intensity values above {sn_threshold}% of Signal to Noise threshold will be considered')
 
+    out_head = []
     output = []
     frags_count = {}
     all_peps = {}
@@ -293,8 +294,13 @@ def map_frags(infile, fasta, tolerance, mass_type):
                             frag_num = ions.split('+')[0].rstrip('[').lstrip(frag_type)
                             decoy = "0"
                             quant_trans = "1"
-                            #print (transition_group_id, transition_name, proteinID, pep, modpep, fullpepname, rt, prec_mz, charge, prod_mz, prod_z, lib_intense, frag_type, frag_num, decoy, quant_trans)
-                            output.append([transition_group_id, transition_name, proteinID, pep, modpep, fullpepname, rt, prec_mz, charge, prod_mz, prod_z, lib_intense, frag_type, frag_num, decoy, quant_trans])
+                            if out_fmt == "openswath":
+                                #print (transition_group_id, transition_name, proteinID, pep, modpep, fullpepname, rt, prec_mz, charge, prod_mz, prod_z, lib_intense, frag_type, frag_num, decoy, quant_trans)
+                                out_head = ["transition_group_id","transition_name","ProteinId","PeptideSequence","ModifiedPeptideSequence","FullPeptideName","RetentionTime","PrecursorMz","PrecursorCharge","ProductMz","ProductCharge","LibraryIntensity","FragmentIonType","FragmentSeriesNumber","IsDecoy","quantifying_transition"]
+                                output.append([transition_group_id, transition_name, proteinID, pep, modpep, fullpepname, rt, prec_mz, charge, prod_mz, prod_z, lib_intense, frag_type, frag_num, decoy, quant_trans])
+                            elif out_fmt == "spectronaut":
+                                out_head = ["ProteinId","ModifiedSequence","StrippedSequence","iRT","Q1","PrecursorCharge","Q3","FragmentCharge","FragmentType","FragmentNumber","FragmentLossMass","FragmentLossType","IsotopicLabel","RelativeFragmentIntensity","Decoy"]
+                                output.append([proteinID,modpep,pep,"",prec_mz,charge, prod_mz, prod_z,frag_type,frag_num,"0","","light",lib_intense,"FALSE"])
 
             except:
                 print (f'Cound not write the peptide transitions of {modpep}')
@@ -307,11 +313,17 @@ def map_frags(infile, fasta, tolerance, mass_type):
     print (f'INFO: The library contains annotated peaks for {len(all_peps)} peptide precursors')
     print (f'INFO: Peptides with less than 3 transitions were excluded in the output library')
     print (f'INFO: {len(output)} transitions corresponding to {len(all_peps)} peptide precursors were converted to a OpenSwath library format')
+
+    if file_fmt == 'tsv':
+        splitter = "\t"
+        outfile = "{0}_OpenSwath.tsv".format(infile.rstrip('blib').rstrip('.'))
+    elif file_fmt == 'csv':
+        splitter = ","
+        outfile = "{0}_OpenSwath.csv".format(infile.rstrip('blib').rstrip('.'))
     
-    outfile = "{0}_OpenSwath.tsv".format(infile.rstrip('blib').rstrip('.'))
     with open(outfile, 'w') as outf:
-        outf.write("transition_group_id\ttransition_name\tProteinId\tPeptideSequence\tModifiedPeptideSequence\tFullPeptideName\tRetentionTime\tPrecursorMz\tPrecursorCharge\tProductMz\tProductCharge\tLibraryIntensity\tFragmentIonType\tFragmentSeriesNumber\tIsDecoy\tquantifying_transition\n")
-        outf.writelines('\t'.join(i) + '\n' for i in output)
+        outf.write(splitter.join(out_head) + '\n')
+        outf.writelines(splitter.join(i) + '\n' for i in output)
 
     print (f"INFO: A OpenSwath compatible spectral library {outfile} was generated")
 
@@ -320,7 +332,7 @@ def map_frags(infile, fasta, tolerance, mass_type):
 if __name__== "__main__":
 
     if os.path.isfile(os.path.join(args.infile[0])) and args.infile[0].split('.')[-1] == 'blib':
-        map_frags(args.infile[0], args.fasta[0], args.tol[0], args.mz_type[0])
+        map_frags(args.infile[0], args.fasta[0], args.tol[0], args.mz_type[0], "openswath", "tsv")
         print (f"FINISHED: Completed the convertion of {args.infile[0]} to OpenSwath format")
 
     #### Convert multiple BLIB spectral libraries present in a given input folder in loop
@@ -334,5 +346,5 @@ if __name__== "__main__":
 
         for idx, infile in enumerate(infiles):
             print (f"INFO: Processing file {idx + 1} of {len(infiles)} BLIB spectral libraries in {args.infile[0]}")
-            map_frags(infile, args.fasta[0], args.tol[0], args.mz_type[0])
+            map_frags(infile, args.fasta[0], args.tol[0], args.mz_type[0], "openswath", "tsv")
             print (f"FINISHED: Completed the convertion of {os.path.split(infile)[1]} to OpenSwath format")
