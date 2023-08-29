@@ -9,7 +9,6 @@ from scripts import parse_binary
 import os
 import argparse
 
-
 parser = argparse.ArgumentParser(description='''Blib2OpenSwath: Convert spectral library from BLIB (Skyline) to OpenSwath format''')
 
 parser.add_argument('--infile', metavar='-i', type=str, nargs='+', help='The input spectral library file in BLIB format either from Skyline or BiblioSpec output')
@@ -276,11 +275,17 @@ def map_frags(infile, fasta, tolerance, mass_type, out_fmt, file_fmt):
             all_peps[modpep + '@' + str(z)] = [str(len(matching_values)) + '@' + str(iD)]
             try:
                 if len(matching_ions) >= 3:
+                    
+                    if len(matching_intense) != 0:
+                        norm_intense = matching_intense/np.max(matching_intense)
+                    else:
+                        raise ValueError
+                    
                     for index, ions in np.ndenumerate(matching_ions):
                         proteinID = annotate_pep(pep, theo_peps)
                         if (matching_intense[index]/max_ints)*100 > sn_threshold and proteinID != "Not Found": ### Consider fragments with S/N ratio > S/N threshold and matching to only the target fasta sequences
                             transition_group_id = modpep + '+' + str(z)
-                            transition_name = transition_group_id + '_' + ions
+                            transition_name = transition_group_id + "_" + ions.split('[')[0] + '+' + str(z)
                             pep = pep
                             modpep = modpep
                             fullpepname = pep
@@ -289,7 +294,7 @@ def map_frags(infile, fasta, tolerance, mass_type, out_fmt, file_fmt):
                             charge = str(z)
                             prod_mz = str(matching_values[index])
                             prod_z = str(ions.split('+')[1][0])
-                            lib_intense = str(round(matching_intense[index],4))
+                            lib_intense = str(norm_intense[index])
                             frag_type = str(ions[0])
                             frag_num = ions.split('+')[0].rstrip('[').lstrip(frag_type)
                             decoy = "0"
@@ -303,6 +308,7 @@ def map_frags(infile, fasta, tolerance, mass_type, out_fmt, file_fmt):
                                 output.append([proteinID,modpep,pep,"",prec_mz,charge, prod_mz, prod_z,frag_type,frag_num,"0","","light",lib_intense,"FALSE"])
 
             except:
+                
                 print (f'Cound not write the peptide transitions of {modpep}')
 
             
