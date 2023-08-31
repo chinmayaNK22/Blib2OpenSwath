@@ -19,6 +19,10 @@ parser.add_argument('--tol',metavar='-t', type=float, nargs='+', help='Library m
 
 parser.add_argument('--mz_type',metavar='-m', type=str, nargs='+', help='Specify the type of fragment m/z values present in the input spectral library (Ex: "average" or "mono")')
 
+parser.add_argument('--lib_fmt',metavar='-l', type=str, nargs='+', help='Specify the spectra library format (Ex: "openswath" or "spectronaut")')
+
+parser.add_argument('--fmt',metavar='-o', type=str, nargs='+', help='Specify the output spectra library file format (Ex: "tsv" or "csv")')
+
 args = parser.parse_args()
 
 def fetch_sqlite3_db(infile, table):
@@ -304,8 +308,14 @@ def map_frags(infile, fasta, tolerance, mass_type, out_fmt, file_fmt):
                                 out_head = ["transition_group_id","transition_name","ProteinId","PeptideSequence","ModifiedPeptideSequence","FullPeptideName","RetentionTime","PrecursorMz","PrecursorCharge","ProductMz","ProductCharge","LibraryIntensity","FragmentIonType","FragmentSeriesNumber","IsDecoy","quantifying_transition"]
                                 output.append([transition_group_id, transition_name, proteinID, pep, modpep, fullpepname, rt, prec_mz, charge, prod_mz, prod_z, lib_intense, frag_type, frag_num, decoy, quant_trans])
                             elif out_fmt == "spectronaut":
-                                out_head = ["ProteinId","ModifiedSequence","StrippedSequence","iRT","Q1","PrecursorCharge","Q3","FragmentCharge","FragmentType","FragmentNumber","FragmentLossMass","FragmentLossType","IsotopicLabel","RelativeFragmentIntensity","Decoy"]
-                                output.append([proteinID,modpep,pep,"",prec_mz,charge, prod_mz, prod_z,frag_type,frag_num,"0","","light",lib_intense,"FALSE"])
+
+                                _modpep = modpep.replace('+57.0', 'Carbamidomethyl (C)').replace('+16.0', 'Oxidation (M)').replace('+42.0','Acetyl (M)')
+                                
+                                out_head = ["RelativeIntensity","FragmentMz","ModifiedPeptide","LabeledPeptide","StrippedPeptide","PrecursorCharge","PrecursorMz","iRT","proteotypicity","FragmentNumber","FragmentType","FragmentCharge","FragmentLossType"]
+                                #out_head = ["ProteinId","ModifiedSequence","StrippedSequence","iRT","Q1","PrecursorCharge","Q3","FragmentCharge","FragmentType","FragmentNumber","FragmentLossMass","FragmentLossType","IsotopicLabel","RelativeFragmentIntensity","Decoy"]
+                                #output.append([proteinID,modpep,pep,"",prec_mz,charge, prod_mz, prod_z,frag_type,frag_num,"0","","light",lib_intense,"FALSE"])
+                                output.append([lib_intense, prod_mz, '_' + _modpep + '_', pep, pep, charge, prec_mz, "0", "", frag_num, frag_type, prod_z, "noloss"])
+                                
 
             except:
                 
@@ -338,7 +348,7 @@ def map_frags(infile, fasta, tolerance, mass_type, out_fmt, file_fmt):
 if __name__== "__main__":
 
     if os.path.isfile(os.path.join(args.infile[0])) and args.infile[0].split('.')[-1] == 'blib':
-        map_frags(args.infile[0], args.fasta[0], args.tol[0], args.mz_type[0], "openswath", "tsv")
+        map_frags(args.infile[0], args.fasta[0], args.tol[0], args.mz_type[0], args.lib_fmt[0], args.fmt[0])
         print (f"FINISHED: Completed the convertion of {args.infile[0]} to OpenSwath format")
 
     #### Convert multiple BLIB spectral libraries present in a given input folder in loop
@@ -352,5 +362,5 @@ if __name__== "__main__":
 
         for idx, infile in enumerate(infiles):
             print (f"INFO: Processing file {idx + 1} of {len(infiles)} BLIB spectral libraries in {args.infile[0]}")
-            map_frags(infile, args.fasta[0], args.tol[0], args.mz_type[0], "openswath", "tsv")
+            map_frags(infile, args.fasta[0], args.tol[0], args.mz_type[0], args.lib_fmt[0], args.fmt[0])
             print (f"FINISHED: Completed the convertion of {os.path.split(infile)[1]} to OpenSwath format")
