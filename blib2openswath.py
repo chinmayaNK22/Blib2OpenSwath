@@ -343,11 +343,10 @@ def map_frags(infile, fasta, tolerance, mass_type, out_fmt, file_fmt):
     if file_fmt == 'tsv':
         splitter = "\t"
         suffix = gen_suffix(out_fmt)
-        outfile = "{0}_{suffix}.tsv".format(infile.rstrip('blib').rstrip('.'))
+        outfile = infile.rstrip('blib').rstrip('.') + f"_{suffix}.tsv"
     elif file_fmt == 'csv':
         splitter = ","
         suffix = gen_suffix(out_fmt)
-        print (suffix)
         outfile = infile.rstrip('blib').rstrip('.') + f"_{suffix}.csv"
     
     with open(outfile, 'w') as outf:
