@@ -303,11 +303,12 @@ def map_frags(infile, fasta, tolerance, mass_type, out_fmt, file_fmt):
                             frag_num = ions.split('+')[0].rstrip('[').lstrip(frag_type)
                             decoy = "0"
                             quant_trans = "1"
-                            if out_fmt == "openswath":
+                            if out_fmt.lower() == "openswath":
                                 #print (transition_group_id, transition_name, proteinID, pep, modpep, fullpepname, rt, prec_mz, charge, prod_mz, prod_z, lib_intense, frag_type, frag_num, decoy, quant_trans)
                                 out_head = ["transition_group_id","transition_name","ProteinId","PeptideSequence","ModifiedPeptideSequence","FullPeptideName","RetentionTime","PrecursorMz","PrecursorCharge","ProductMz","ProductCharge","LibraryIntensity","FragmentIonType","FragmentSeriesNumber","IsDecoy","quantifying_transition"]
                                 output.append([transition_group_id, transition_name, proteinID, pep, modpep, fullpepname, rt, prec_mz, charge, prod_mz, prod_z, lib_intense, frag_type, frag_num, decoy, quant_trans])
-                            elif out_fmt == "spectronaut":
+
+                            if out_fmt.lower() == "spectronaut":
 
                                 _modpep = modpep.replace('+57.0', 'Carbamidomethyl (C)').replace('+16.0', 'Oxidation (M)').replace('+42.0','Acetyl (M)')
                                 
@@ -330,12 +331,23 @@ def map_frags(infile, fasta, tolerance, mass_type, out_fmt, file_fmt):
     print (f'INFO: Peptides with less than 3 transitions were excluded in the output library')
     print (f'INFO: {len(output)} transitions corresponding to {len(all_peps)} peptide precursors were converted to a OpenSwath library format')
 
+    def gen_suffix(out_fmt):
+        if out_fmt.lower() == "openswath":
+            suffix = "OpenSwath"
+            
+        elif out_fmt.lower() == "spectronaut":
+            suffix = "Spectronaut"
+
+        return suffix
+            
     if file_fmt == 'tsv':
         splitter = "\t"
-        outfile = "{0}_OpenSwath.tsv".format(infile.rstrip('blib').rstrip('.'))
+        suffix = gen_suffix(out_fmt)
+        outfile = "{0}_{suffix}.tsv".format(infile.rstrip('blib').rstrip('.'))
     elif file_fmt == 'csv':
         splitter = ","
-        outfile = "{0}_OpenSwath.csv".format(infile.rstrip('blib').rstrip('.'))
+        suffix = gen_suffix(out_fmt)
+        outfile = "{0}_{suffix}.csv".format(infile.rstrip('blib').rstrip('.'))
     
     with open(outfile, 'w') as outf:
         outf.write(splitter.join(out_head) + '\n')
