@@ -1,4 +1,4 @@
-from pyteomics import mass
+from pyteomics import mass, parser
 import numpy as np
 
 db = mass.Unimod()
@@ -26,6 +26,12 @@ def add_losses(ion_name, z, frag, frag_mz, losses, exclude, mass_type):
             theo_frag.append(frag_mz - loss_mz/(z + 1))
         
     return np.asarray(ion_type), np.asarray(theo_frag)
+
+def digest_protein(pro_seq, protease, miss_cleaves):
+
+    peptides = parser.cleave(pro_seq, parser.expasy_rules[protease.lower()], int(miss_cleaves))
+
+    return peptides
     
 def calc_theo_mz(pep, charge, ions, losses, mods, mass_type):
 
