@@ -67,12 +67,14 @@ def digest_pro(fasta):
     for rows in readfasta(fasta).read():
         for x in range(0, missed_cleaves+1):
             if protease == 'trypsin':
-                peps = ProteinDigestion(rows[1],x,min_len,max_len).trypsin()
+                #peps = ProteinDigestion(rows[1],x,min_len,max_len).trypsin()
+                peps = pyteomics_utils.digest_protein(rows[1], protease, missed_cleaves)
                 for pep in peps:
-                    if pep not in dig_peps:
-                        dig_peps[pep] = [rows[0].split(' ')[0]]
-                    else:
-                        dig_peps[pep].append(rows[0].split(' ')[0])
+                    if len(pep) < 80 and len(pep) > 6:
+                        if pep not in dig_peps:
+                            dig_peps[pep] = [rows[0].split(' ')[0]]
+                        else:
+                            dig_peps[pep].append(rows[0].split(' ')[0])
 
     print (f'INFO: The in-silico {protease} digestion of {os.path.split(fasta)[1]} has resulted in {len(dig_peps)} tryptic peptides')
     
@@ -167,6 +169,47 @@ def align_spectra(theo_spectrum, observed_spectrum):
     print("Number of matched peaks: " + str(len(alignment)))
     print("ion\ttheo. m/z\tobserved m/z")
 
+def gen_lib_inputs(pep_attrs, pep, modpep, z, rt_idx, mz_idx, matching_ions, matching_values, matching_intense, sn_threshold, maximum_intensity, proteinID, out_fmt):
+
+    if len(matching_ions) >= 3:
+        
+        if len(matching_intense) != 0:
+            norm_intense = matching_intense/np.max(matching_intense)
+        else:
+            raise ValueError
+
+        for index, ions in np.ndenumerate(matching_ions):
+            if (matching_intense[index]/maximum_intensity)*100 > sn_threshold and proteinID != "Not Found": ### Consider fragments with S/N ratio > S/N threshold and matching to only the target fasta sequences
+                transition_group_id = modpep + '+' + str(z)
+                transition_name = transition_group_id + "_" + ions.split('[')[0] + '+' + str(z)
+                pep = pep
+                modpep = modpep
+                fullpepname = pep
+                rt = str(round(pep_attrs[rt_idx]*60,4))
+                prec_mz = str(round(pep_attrs[mz_idx],5))
+                charge = str(z)
+                prod_mz = str(matching_values[index])
+                prod_z = str(ions.split('+')[1][0])
+                lib_intense = str(norm_intense[index])
+                frag_type = str(ions[0])
+                frag_num = ions.split('+')[0].rstrip('[').lstrip(frag_type)
+                decoy = "0"
+                quant_trans = "1"
+                if out_fmt.lower() == "openswath":
+                    #print (transition_group_id, transition_name, proteinID, pep, modpep, fullpepname, rt, prec_mz, charge, prod_mz, prod_z, lib_intense, frag_type, frag_num, decoy, quant_trans)
+                    out_head = ["transition_group_id","transition_name","ProteinId","PeptideSequence","ModifiedPeptideSequence","FullPeptideName","RetentionTime","PrecursorMz","PrecursorCharge","ProductMz","ProductCharge","LibraryIntensity","FragmentIonType","FragmentSeriesNumber","IsDecoy","quantifying_transition"]
+                    yield out_head, transition_group_id, transition_name, proteinID, pep, modpep, fullpepname, rt, prec_mz, charge, prod_mz, prod_z, lib_intense, frag_type, frag_num, decoy, quant_trans
+
+                if out_fmt.lower() == "spectronaut":
+
+                    _modpep = modpep.replace('+57.0', 'Carbamidomethyl (C)').replace('+16.0', 'Oxidation (M)').replace('+42.0','Acetyl (M)')
+                    
+                    out_head = ["RelativeIntensity","FragmentMz","ModifiedPeptide","LabeledPeptide","StrippedPeptide","PrecursorCharge","PrecursorMz","iRT","proteotypicity","FragmentNumber","FragmentType","FragmentCharge","FragmentLossType"]
+                    #out_head = ["ProteinId","ModifiedSequence","StrippedSequence","iRT","Q1","PrecursorCharge","Q3","FragmentCharge","FragmentType","FragmentNumber","FragmentLossMass","FragmentLossType","IsotopicLabel","RelativeFragmentIntensity","Decoy"]
+                    #output.append([proteinID,modpep,pep,"",prec_mz,charge, prod_mz, prod_z,frag_type,frag_num,"0","","light",lib_intense,"FALSE"])
+                    yield out_head, lib_intense, prod_mz, '_' + _modpep + '_', pep, pep, charge, prec_mz, "0", "", frag_num, frag_type, prod_z, "noloss"
+                        
+            
 def map_frags(infile, fasta, tolerance, mass_type, out_fmt, file_fmt):
     theo_peps = digest_pro(fasta)
     print (f"INFO: A library match tolerance of {tolerance} Da was set for the spectral library generation")
@@ -202,6 +245,7 @@ def map_frags(infile, fasta, tolerance, mass_type, out_fmt, file_fmt):
 
     print (f'INFO: Fragments with intensity values above {sn_threshold}% of Signal to Noise threshold will be considered')
 
+    pep_pre = 0
     out_head = []
     output = []
     frags_count = {}
@@ -212,7 +256,7 @@ def map_frags(infile, fasta, tolerance, mass_type, out_fmt, file_fmt):
         modpep = p[4]
         z = p[3]
         iD = p[0]
-
+        proteinID = annotate_pep(pep, theo_peps)
         #### Generate theoretical fragment ions with or without modifications accordingly
         if iD in Mods:
             if mass_type == 'average':
@@ -274,62 +318,26 @@ def map_frags(infile, fasta, tolerance, mass_type, out_fmt, file_fmt):
                                 matching_intense = np.append(matching_intense, ex_frag_intensity[exp_mz_idx])
                             except:
                                 matching_intense = np.append(matching_intense, 0)
+        
+        #if modpep + '@' + str(z) not in all_peps:
+        #    all_peps[modpep + '@' + str(z)] = [str(len(matching_values)) + '@' + str(iD)]
 
-        if modpep + '@' + str(z) not in all_peps:
-            all_peps[modpep + '@' + str(z)] = [str(len(matching_values)) + '@' + str(iD)]
-            try:
-                if len(matching_ions) >= 3:
-                    
-                    if len(matching_intense) != 0:
-                        norm_intense = matching_intense/np.max(matching_intense)
-                    else:
-                        raise ValueError
-                    
-                    for index, ions in np.ndenumerate(matching_ions):
-                        proteinID = annotate_pep(pep, theo_peps)
-                        if (matching_intense[index]/max_ints)*100 > sn_threshold and proteinID != "Not Found": ### Consider fragments with S/N ratio > S/N threshold and matching to only the target fasta sequences
-                            transition_group_id = modpep + '+' + str(z)
-                            transition_name = transition_group_id + "_" + ions.split('[')[0] + '+' + str(z)
-                            pep = pep
-                            modpep = modpep
-                            fullpepname = pep
-                            rt = str(round(p[rt_idx]*60,4))
-                            prec_mz = str(round(p[mz_idx],5))
-                            charge = str(z)
-                            prod_mz = str(matching_values[index])
-                            prod_z = str(ions.split('+')[1][0])
-                            lib_intense = str(norm_intense[index])
-                            frag_type = str(ions[0])
-                            frag_num = ions.split('+')[0].rstrip('[').lstrip(frag_type)
-                            decoy = "0"
-                            quant_trans = "1"
-                            if out_fmt.lower() == "openswath":
-                                #print (transition_group_id, transition_name, proteinID, pep, modpep, fullpepname, rt, prec_mz, charge, prod_mz, prod_z, lib_intense, frag_type, frag_num, decoy, quant_trans)
-                                out_head = ["transition_group_id","transition_name","ProteinId","PeptideSequence","ModifiedPeptideSequence","FullPeptideName","RetentionTime","PrecursorMz","PrecursorCharge","ProductMz","ProductCharge","LibraryIntensity","FragmentIonType","FragmentSeriesNumber","IsDecoy","quantifying_transition"]
-                                output.append([transition_group_id, transition_name, proteinID, pep, modpep, fullpepname, rt, prec_mz, charge, prod_mz, prod_z, lib_intense, frag_type, frag_num, decoy, quant_trans])
-
-                            if out_fmt.lower() == "spectronaut":
-
-                                _modpep = modpep.replace('+57.0', 'Carbamidomethyl (C)').replace('+16.0', 'Oxidation (M)').replace('+42.0','Acetyl (M)')
-                                
-                                out_head = ["RelativeIntensity","FragmentMz","ModifiedPeptide","LabeledPeptide","StrippedPeptide","PrecursorCharge","PrecursorMz","iRT","proteotypicity","FragmentNumber","FragmentType","FragmentCharge","FragmentLossType"]
-                                #out_head = ["ProteinId","ModifiedSequence","StrippedSequence","iRT","Q1","PrecursorCharge","Q3","FragmentCharge","FragmentType","FragmentNumber","FragmentLossMass","FragmentLossType","IsotopicLabel","RelativeFragmentIntensity","Decoy"]
-                                #output.append([proteinID,modpep,pep,"",prec_mz,charge, prod_mz, prod_z,frag_type,frag_num,"0","","light",lib_intense,"FALSE"])
-                                output.append([lib_intense, prod_mz, '_' + _modpep + '_', pep, pep, charge, prec_mz, "0", "", frag_num, frag_type, prod_z, "noloss"])
-                                
-
-            except:
-                
-                print (f'Cound not write the peptide transitions of {modpep}')
-
+        try:
+            lib_row = gen_lib_inputs(p, pep, modpep, z, rt_idx, mz_idx, matching_ions, matching_values, matching_intense, sn_threshold, max_ints, proteinID, out_fmt)
+            pep_pre += 1
+            for row in lib_row:
+                out_head = row[0]
+                output.append(list(row[1:]))
             
-        else:
-            all_peps[modpep + '@' + str(z)].append(str(len(matching_values)) + '@' + str(iD))
+        except:
+            print (f'Cound not write the peptide transitions of {modpep}')
+        #else:
+        #    all_peps[modpep + '@' + str(z)].append(str(len(matching_values)) + '@' + str(iD))
 
         
-    print (f'INFO: The library contains annotated peaks for {len(all_peps)} peptide precursors')
+    print (f'INFO: The library contains annotated peaks for {pep_pre} peptide precursors')
     print (f'INFO: Peptides with less than 3 transitions were excluded in the output library')
-    print (f'INFO: {len(output)} transitions corresponding to {len(all_peps)} peptide precursors were converted to a OpenSwath library format')
+    print (f'INFO: {len(output)} transitions corresponding to {pep_pre} peptide precursors were converted to a OpenSwath library format')
 
     def gen_suffix(out_fmt):
         if out_fmt.lower() == "openswath":
@@ -339,7 +347,7 @@ def map_frags(infile, fasta, tolerance, mass_type, out_fmt, file_fmt):
             suffix = "Spectronaut"
 
         return suffix
-            
+    
     if file_fmt == 'tsv':
         splitter = "\t"
         suffix = gen_suffix(out_fmt)
